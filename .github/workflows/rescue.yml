@@ -1,0 +1,59 @@
+name: Rescue Compile (Skip Build)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run ID of the successful build (number from the URL)'
+        required: true
+        type: string
+
+jobs:
+  rescue_compile:
+    name: Compile Unsigned IPA
+    runs-on: macos-latest
+    steps:
+      - name: Download Xcode Project
+        uses: actions/download-artifact@v4
+        with:
+          name: xcode-project
+          path: build/iOS
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Find and Compile Xcode Project
+        run: |
+          # Search for the exact location of the Xcode project
+          PROJECT_PATH=$(find build/iOS -name "Unity-iPhone.xcodeproj" -type d | head -n 1)
+          
+          if [ -z "$PROJECT_PATH" ]; then
+            echo "Error: Could not find Unity-iPhone.xcodeproj. Listing downloaded files:"
+            ls -R build/iOS
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$PROJECT_PATH")
+          echo "Navigating to: $PROJECT_DIR"
+          cd "$PROJECT_DIR"
+
+          # Compile the project
+          xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release -sdk iphoneos SYMROOT="$(PWD)/build" build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+
+      - name: Package into IPA
+        run: |
+          PROJECT_PATH=$(find build/iOS -name "Unity-iPhone.xcodeproj" -type d | head -n 1)
+          PROJECT_DIR=$(dirname "$PROJECT_PATH")
+          cd "$PROJECT_DIR"
+
+          mkdir -p Payload
+          mv build/Release-iphoneos/*.app Payload/
+          zip -qr TroskiSimulator.ipa Payload
+          
+          # Move the IPA to the main workspace so it's easy to upload
+          mv TroskiSimulator.ipa ${{ github.workspace }}/TroskiSimulator.ipa
+
+      - name: Upload Final IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: TroskiSimulator-IPA
+          path: ${{ github.workspace }}/TroskiSimulator.ipa
