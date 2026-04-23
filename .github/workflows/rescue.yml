@@ -39,6 +39,9 @@ jobs:
           # Fix permissions lost during artifact zip/unzip
           find . -name "*.sh" -exec chmod +x {} \;
 
+          # Force Xcode to ignore the legacy -mno-thumb flag which breaks arm64 compilation
+          sed -i '' 's/-mno-thumb//g' Unity-iPhone.xcodeproj/project.pbxproj
+
           # Compile the project
           xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release -sdk iphoneos SYMROOT="$(PWD)/build" build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
 
