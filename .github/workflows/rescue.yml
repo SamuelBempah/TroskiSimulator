@@ -36,6 +36,9 @@ jobs:
           echo "Navigating to: $PROJECT_DIR"
           cd "$PROJECT_DIR"
 
+          # Fix permissions lost during artifact zip/unzip
+          find . -name "*.sh" -exec chmod +x {} \;
+
           # Compile the project
           xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release -sdk iphoneos SYMROOT="$(PWD)/build" build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
 
