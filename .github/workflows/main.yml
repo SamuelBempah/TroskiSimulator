@@ -1,0 +1,77 @@
+name: Build Troski Simulator iOS (Unsigned IPA)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build_unity:
+    name: Build Xcode Project
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v3
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Build iOS Xcode Project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: iOS
+          buildName: TroskiSimulator
+
+      - name: Upload Xcode Project
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcode-project
+          path: build/iOS
+
+  build_ipa:
+    name: Compile Unsigned IPA
+    needs: build_unity
+    runs-on: macos-latest
+    steps:
+      - name: Download Xcode Project
+        uses: actions/download-artifact@v4
+        with:
+          name: xcode-project
+          path: build/iOS
+
+      - name: Compile Xcode to Unsigned App
+        run: |
+          cd build/iOS
+          # Force code signing off so xcodebuild doesn't fail looking for an Apple cert
+          xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release -sdk iphoneos SYMROOT="$(PWD)/build" build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+
+      - name: Package into IPA for Sideloadly
+        run: |
+          cd build/iOS
+          mkdir -p Payload
+          # Move the compiled app into the Payload folder (required structure for IPA)
+          mv build/Release-iphoneos/*.app Payload/
+          # Zip it up as an IPA file
+          zip -qr TroskiSimulator.ipa Payload
+
+      - name: Upload Final IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: TroskiSimulator-IPA
+          path: build/iOS/TroskiSimulator.ipa
