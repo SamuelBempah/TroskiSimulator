@@ -36,6 +36,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: iOS
+          unityVersion: 2020.3.32f1
           buildName: TroskiSimulator
 
       - name: Upload Xcode Project
